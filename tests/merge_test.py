@@ -1,4 +1,4 @@
-from generate_data import (
+from kartograf.util.generate_data import (
     build_file_lines,
     generate_ip_file,
     generate_file_items,
