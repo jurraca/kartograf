@@ -2,7 +2,7 @@ import sys
 import re
 from importlib.metadata import distribution, PackageNotFoundError
 
-from kartograf.util import check_compatibility
+from kartograf.util.util import check_compatibility
 
 CHECK_MARK = "\U00002705"
 CROSS_MARK = "\U0000274C"

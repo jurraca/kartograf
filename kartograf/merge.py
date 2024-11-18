@@ -2,7 +2,7 @@ import ipaddress
 import shutil
 import pandas as pd
 
-from kartograf.timed import timed
+from kartograf.util.timed import timed
 
 class BaseNetworkIndex:
     '''
@@ -15,7 +15,7 @@ class BaseNetworkIndex:
     def __init__(self):
         self._dict = {}
         self._keys = self._dict.keys()
-        for i in range(0, 255):
+        for i in range(0, 256):
             self._dict[i] = []
 
     def update(self, pfx):

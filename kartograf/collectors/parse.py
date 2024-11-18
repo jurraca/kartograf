@@ -3,8 +3,8 @@ from kartograf.bogon import (
     is_bogon_asn,
     is_out_of_encoding_range,
 )
-from kartograf.timed import timed
-from kartograf.util import format_pfx
+from kartograf.util.timed import timed
+from kartograf.util.util import format_pfx
 
 
 @timed

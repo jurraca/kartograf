@@ -3,8 +3,8 @@ import gzip
 import shutil
 import time
 
-from kartograf.timed import timed
-from kartograf.util import calculate_sha256
+from kartograf.util.timed import timed
+from kartograf.util.util import calculate_sha256
 
 IRR_FILE_ADDRESSES = [
     # AFRINIC

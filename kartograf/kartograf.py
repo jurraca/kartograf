@@ -12,8 +12,8 @@ from kartograf.irr.parse import parse_irr
 from kartograf.merge import merge_irr, merge_pfx2as, general_merge
 from kartograf.rpki.fetch import fetch_rpki_db, validate_rpki_db
 from kartograf.rpki.parse import parse_rpki
-from kartograf.sort import sort_result_by_pfx
-from kartograf.util import (
+from kartograf.util.sort import sort_result_by_pfx
+from kartograf.util.util import (
     calculate_sha256,
     check_compatibility,
     print_section_header,

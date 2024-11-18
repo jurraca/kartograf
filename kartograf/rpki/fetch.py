@@ -8,8 +8,8 @@ import pathlib
 import requests
 from tqdm import tqdm
 
-from kartograf.timed import timed
-from kartograf.util import (
+from kartograf.util.timed import timed
+from kartograf.util.util import (
     calculate_sha256,
     calculate_sha256_directory,
 )
