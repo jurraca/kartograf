@@ -6,8 +6,8 @@ import sys
 from bs4 import BeautifulSoup
 import requests
 
-from kartograf.timed import timed
-from kartograf.util import calculate_sha256
+from kartograf.util.timed import timed
+from kartograf.util.util import calculate_sha256
 
 # Routeviews Prefix to AS mappings Dataset for IPv4 and IPv6
 # https://www.caida.org/catalog/datasets/routeviews-prefix2as/

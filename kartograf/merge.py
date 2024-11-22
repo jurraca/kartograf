@@ -2,7 +2,7 @@ import ipaddress
 import shutil
 import pandas as pd
 
-from kartograf.timed import timed
+from kartograf.util.timed import timed
 
 class BaseNetworkIndex:
     '''

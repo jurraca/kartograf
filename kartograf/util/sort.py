@@ -1,7 +1,7 @@
 import ipaddress
 import shutil
 
-from kartograf.timed import timed
+from kartograf.util.timed import timed
 
 
 @timed
