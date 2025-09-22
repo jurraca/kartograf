@@ -1,7 +1,7 @@
 from pathlib import Path
 import ipaddress
 import shutil
-import pandas as pd
+import polars as pl
 
 from kartograf.timed import timed
 from kartograf.util import get_root_network
@@ -35,7 +35,7 @@ class BaseNetworkIndex:
         v = ipn.version
         root_net = get_root_network(pfx)
 
-        if (root_net in self._v4_keys) or (root_net in self._v6_keys):
+        if root_net in self._dict[v]:
             current = self._dict[v][root_net]
             self._dict[v][root_net] = current + [(netw, mask)]
         else:
@@ -47,13 +47,16 @@ class BaseNetworkIndex:
         is equal to the base network IP.
         """
         for net, mask in self._dict[version][root_net]:
-            if row[0] & mask == net:
+            if row['INETS'] & mask == net:
                 return 1
         return 0
 
     def contains_row(self, row):
-        root_net = row.PFXS_LEADING
-        version = ipaddress.ip_network(row.PFXS).version
+        # Handle both pandas-style named tuples and polars-style dictionaries
+        root_net = row['PFXS_LEADING']
+        pfxs = row['PFXS']
+
+        version = ipaddress.ip_network(pfxs).version
         if version == 4 and (root_net in self._v4_keys):
             return self.check_inclusion(row, root_net, version)
         if version == 6 and (root_net in self._v6_keys):
@@ -122,11 +125,16 @@ def extra_file_to_df(extra_file_path):
             root_net = get_root_network(pfx)
             extra_pfxs_leading.append(root_net)
 
-    df_extra = pd.DataFrame({
+    df_extra = pl.DataFrame({
         "INETS": extra_nets_int,
         "ASNS": extra_asns,
         "PFXS": extra_pfxs,
         "PFXS_LEADING": extra_pfxs_leading
+        }, schema={
+        "INETS": pl.Object,  # Use Object type to handle large IPv6 integers
+        "ASNS": pl.String,
+        "PFXS": pl.String,
+        "PFXS_LEADING": pl.Int64
         })
 
     return df_extra
@@ -145,43 +153,47 @@ def general_merge(
             pfx, _ = line.split(" ")
             base.update(pfx)
 
-    print("Parse extra file to Pandas DataFrame")
+    print("Parse extra file to Polars DataFrame")
     df_extra = extra_file_to_df(extra_file)
 
     print("Merging extra prefixes that were not included in the base file.")
+    # Convert to list of named tuples for compatibility with contains_row
     extra_included = []
-    for row in df_extra.itertuples(index=False):
+    for row in df_extra.iter_rows(named=True):
         result = base.contains_row(row)
         extra_included.append(result)
 
-    df_extra["INCLUDED"] = extra_included
-    df_filtered = df_extra[df_extra.INCLUDED == 0]
+    df_extra = df_extra.with_columns(pl.Series("INCLUDED", extra_included))
+    df_filtered = df_extra.filter(pl.col("INCLUDED") == 0)
 
     print("Finished merging extra prefixes.")
 
     if extra_filtered_file:
         print(
-            f"Finished filtering! Originally {len(df_extra.index)} "
-            f"entries filtered down to {len(df_filtered.index)}"
+            f"Finished filtering! Originally {len(df_extra)} "
+            f"entries filtered down to {len(df_filtered)}"
         )
-        df_filtered.to_csv(
+        df_filtered.select(["PFXS", "ASNS"]).write_csv(
             extra_filtered_file,
-            sep=" ",
-            index=False,
-            columns=["PFXS", "ASNS"],
-            header=False,
+            separator=" ",
+            include_header=False
         )
 
         with open(extra_filtered_file, "r") as extra:
             extra_contents = extra.read()
     else:
         print(
-            f"Finished filtering! Originally {len(df_extra.index)} entries "
-            f"filtered down to {len(df_filtered.index)}"
+            f"Finished filtering! Originally {len(df_extra)} entries "
+            f"filtered down to {len(df_filtered)}"
         )
-        extra_contents = df_filtered.to_csv(
-            None, sep=" ", index=False, columns=["PFXS", "ASNS"], header=False
+        # Use StringIO to get CSV content as string
+        import io
+        buffer = io.StringIO()
+        df_filtered.select(["PFXS", "ASNS"]).write_csv(
+            buffer, separator=" ", include_header=False
         )
+        extra_contents = buffer.getvalue()
+        buffer.close()
 
     print("Merging base file with filtered extra file")
     with open(base_file, "r") as base:

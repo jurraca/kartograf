@@ -1,11 +1,9 @@
 import ipaddress
-import numpy as np
-import pandas as pd
+import polars as pl
 from tqdm import tqdm
 
 
 def coverage(map_file, ip_list_file):
-    tqdm.pandas()
 
     rpki_nets = []
     rpki_masks = []
@@ -24,9 +22,8 @@ def coverage(map_file, ip_list_file):
         rpki_masks.append(mask)
         rpki_nets.append(netw)
 
-    net_masks = np.array(rpki_masks)
-    network_addresses = np.array(rpki_nets)
-    zipped = list(zip(net_masks, network_addresses))
+    # Create list of (mask, network_address) tuples for coverage checking
+    zipped = list(zip(rpki_masks, rpki_nets))
 
     addrs = []
     for line in ip_list_file:
@@ -39,7 +36,11 @@ def coverage(map_file, ip_list_file):
                   Please remove and re-run.
                   """)
 
-    df = pd.DataFrame({'ADDRS': addrs})
+    df = pl.DataFrame({
+        'ADDRS': addrs
+    }, schema={
+        'ADDRS': pl.Object  # Use Object type to handle large IPv6 integers
+    })
 
     def check_coverage(addr):
         for mask, net_addr in zipped:
@@ -47,8 +48,14 @@ def coverage(map_file, ip_list_file):
                 return 1
         return 0
 
-    df['COVERED'] = df.ADDRS.progress_apply(check_coverage)
-    df_cov = df[df.COVERED == 1]
+    # Apply coverage check with progress tracking
+    print("Checking IP coverage...")
+    covered_results = []
+    for addr in tqdm(addrs, desc="Checking coverage"):
+        covered_results.append(check_coverage(addr))
+    
+    df = df.with_columns(pl.Series("COVERED", covered_results))
+    df_cov = df.filter(pl.col("COVERED") == 1)
 
     covered = len(df_cov)
     total = len(df)

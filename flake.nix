@@ -24,16 +24,18 @@
       rpki-client = rpki-cli.packages.${system}.default;
       pythonBuildDeps = pkgs.python311.withPackages (ps: [
         ps.beautifulsoup4
-        ps.pandas
+        ps.polars
         ps.requests
         ps.tqdm
       ]);
       pythonDevDeps = pkgs.python311.withPackages (ps: [
         ps.beautifulsoup4
-        ps.pandas
+        ps.polars
         ps.pylint
-	ps.pytest
+        ps.pytest
         ps.requests
+        ps.pandas
+        ps.numpy
         ps.tqdm
       ]);
       kartografDeps = [

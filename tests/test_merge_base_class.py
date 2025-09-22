@@ -1,5 +1,5 @@
 import ipaddress
-import pandas as pd
+import polars as pl
 from kartograf.merge import BaseNetworkIndex
 from kartograf.util import get_root_network
 
@@ -8,15 +8,23 @@ def _df_from_networks(networks, asn=123):
     '''
     Create a one-row dataframe that holds the extra file rows in the expected format for contains_row().
     '''
-    df = pd.DataFrame(
-        columns=["INETS", "ASNS", "PFXS", "PFXS_LEADING"],
-    )
+    rows = []
     for network in networks:
         ipn = ipaddress.ip_network(network)
         root_net = get_root_network(network)
         network_int = int(ipn.network_address)
-        df.loc[len(df)] = [network_int, asn, str(ipn), root_net]
-    return df
+        rows.append([network_int, asn, str(ipn), root_net])
+    
+    return pl.DataFrame(
+        rows,
+        schema={
+            "INETS": pl.Object,  # Use Object type to handle large IPv6 integers
+            "ASNS": pl.Int64,
+            "PFXS": pl.String,
+            "PFXS_LEADING": pl.Int64
+        },
+        orient="row"
+    )
 
 
 def test_base_dict_create():
@@ -27,7 +35,7 @@ def test_base_dict_create():
     ipv4_network = "10.10.0.0/16"
     ipv6_network = "2c0f:ff90::/32"
     df_extra = _df_from_networks([ipv4_network, ipv6_network])
-    for row in df_extra.itertuples(index=False):
+    for row in df_extra.iter_rows(named=True):
         assert not base.contains_row(row)
 
 
@@ -41,7 +49,7 @@ def test_base_dict_update():
     base.update(ipv4_network)
     base.update(ipv6_network)
     df_extra = _df_from_networks([ipv4_network, ipv6_network])
-    for row in df_extra.itertuples(index=False):
+    for row in df_extra.iter_rows(named=True):
         assert base.contains_row(row)
 
 
@@ -54,5 +62,5 @@ def test_check_included_subnet():
     base.update(network)
     subnet = "10.10.0.0/21"
     df_extra = _df_from_networks([subnet])
-    for row in df_extra.itertuples(index=False):
+    for row in df_extra.iter_rows(named=True):
         assert base.contains_row(row)
