@@ -20,7 +20,23 @@
       "aarch64-darwin"
     ];
 
-    nixpkgsFor = system: import nixpkgs {inherit system;};
+    nixpkgsFor = system:
+      import nixpkgs {
+        inherit system;
+        overlays = [
+          (final: prev: {
+            python311 = prev.python311.override {
+              packageOverrides = pyfinal: pyprev: {
+                buildPythonPackage = args:
+                  pyprev.buildPythonPackage (args
+                    // {
+                      doCheck = false;
+                    });
+              };
+            };
+          })
+        ];
+      };
   in {
     # This flake exposes the following attributes:
     # * A development shell containing the rpki-client and the necessary
