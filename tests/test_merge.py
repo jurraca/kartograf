@@ -2,9 +2,10 @@
 Test merging multiple sets of networks, as if they were independent AS files.
 '''
 from pathlib import Path
+from types import SimpleNamespace
 import pytest
 
-from kartograf.merge import general_merge, pick_chunk_size
+from kartograf.merge import general_merge, merge_irr, merge_pfx2as, pick_chunk_size
 
 from .util.generate_data import (
     build_file_lines,
@@ -125,6 +126,58 @@ def test_merge_rpki_supersedes_irr_subnets(tmp_path):
     assert set(final_ips).isdisjoint(set(irr_ips)), (
         f"IRR subnets should not appear in merged output: {set(final_ips) & set(irr_ips)}"
     )
+
+
+def test_three_file_merge_irr_supersedes_routeviews_more_specific(tmp_path):
+    '''
+    Test the full RPKI -> IRR -> Routeviews merge sequence.
+
+    A Routeviews more-specific prefix must not be included when it is covered
+    by an IRR prefix, otherwise Routeviews would supersede IRR under longest
+    prefix match semantics.
+    '''
+    out_dir = tmp_path
+    out_dir_rpki = tmp_path / "rpki"
+    out_dir_irr = tmp_path / "irr"
+    out_dir_collectors = tmp_path / "collectors"
+    out_dir_rpki.mkdir()
+    out_dir_irr.mkdir()
+    out_dir_collectors.mkdir()
+
+    # RPKI has a more-specific prefix whose network address is the same as
+    # the broader IRR prefixes below. The old merge implementation must not
+    # treat this RPKI /22 as covering the IRR /8 or /9.
+    (out_dir_rpki / "rpki_final.txt").write_text("10.0.0.0/8 AS64500\n12.0.0.0/22 AS6269\n")
+    (out_dir_irr / "irr_final.txt").write_text("12.0.0.0/8 AS7018\n12.0.0.0/9 AS7018\n")
+    (out_dir_collectors / "pfx2asn_clean.txt").write_text(
+        "12.0.0.0/8 AS7018\n"
+        "12.0.0.0/9 AS7018\n"
+        "12.2.12.0/24 AS40724\n"
+        "13.0.0.0/8 AS1239\n"
+    )
+
+    context = SimpleNamespace(
+        out_dir=out_dir,
+        out_dir_rpki=out_dir_rpki,
+        out_dir_irr=out_dir_irr,
+        out_dir_collectors=out_dir_collectors,
+        final_result_file=tmp_path / "final_result.txt",
+        cleanup_out_files=[],
+        args=SimpleNamespace(irr=True),
+    )
+
+    merge_irr(context)
+    merge_pfx2as(context)
+
+    result = context.final_result_file.read_text()
+
+    assert "10.0.0.0/8 AS64500\n" in result
+    assert "12.0.0.0/22 AS6269\n" in result
+    assert "12.0.0.0/8 AS7018\n" in result
+    assert "12.0.0.0/9 AS7018\n" in result
+    assert "13.0.0.0/8 AS1239\n" in result
+    assert "12.2.12.0/24 AS40724\n" not in result
+
 
 def test_pick_chunk_size():
     '''
